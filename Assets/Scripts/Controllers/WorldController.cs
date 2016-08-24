@@ -17,7 +17,20 @@ using System.IO;
 
 public class WorldController : MonoBehaviour
 {
+
+    SoundController soundController;
+    TileSpriteController tileSpriteController;
+    CharacterSpriteController characterSpriteController;
+    JobSpriteController jobSpriteController;
+    InventorySpriteController inventorySpriteController;
+    FurnitureSpriteController furnitureSpriteController;
+
+    public BuildModeController buildModeController;
+    public MouseController mouseController;
+    public KeyboardController keyboardController;
+    public SpawnInventoryController spawnInventoryController;
     public ModsManager modsManager;
+
     public static WorldController Instance { get; protected set; }
 
     // The world and tile data
@@ -45,12 +58,10 @@ public class WorldController : MonoBehaviour
     // Multiplier of Time.deltaTime.
     private float timeScale = 1f;
 
-    // An array of possible time multipliers.
-    private float[] possibleTimeScales = new float[6] { 0.1f, 0.5f, 1f, 2f, 4f, 8f };
-    // Current position in that array.
-    int currentTimeScalePosition = 2;
-
     public bool devMode = false;
+
+    public GameObject inventoryUI;
+    public GameObject circleCursorPrefab;
 
     // Use this for initialization
     void OnEnable()
@@ -60,7 +71,7 @@ public class WorldController : MonoBehaviour
 
         if (Instance != null)
         {
-            Logger.LogError("There should never be two world controllers.");
+            Debug.LogError("There should never be two world controllers.");
         }
         Instance = this;
 
@@ -74,76 +85,49 @@ public class WorldController : MonoBehaviour
             CreateEmptyWorld();
         }
 
+        soundController = new SoundController(world);
+    }
+
+    void Start() {
+        GameObject go;
+
+        tileSpriteController = new TileSpriteController(world);
+        tileSpriteController.Render();
+        characterSpriteController = new CharacterSpriteController(world);
+        furnitureSpriteController = new FurnitureSpriteController(world);
+        jobSpriteController = new JobSpriteController(world, furnitureSpriteController);
+        inventorySpriteController = new InventorySpriteController(world, inventoryUI);
+        buildModeController = new BuildModeController();
+        if(Settings.getSettingAsBool("DevTools_enabled", false))
+        {
+            spawnInventoryController = new SpawnInventoryController();
+        }
+        mouseController = new MouseController(buildModeController, furnitureSpriteController, circleCursorPrefab);
+        keyboardController = new KeyboardController(buildModeController, Instance);
+
         //Initialising controllers
         GameObject Controllers = GameObject.Find("Controllers");
         Instantiate(Resources.Load("UIController"), Controllers.transform);
+
+        GameObject Canvas = GameObject.Find("Canvas");
+        go = Instantiate(Resources.Load("UI/ContextMenu"),Canvas.transform.position, Canvas.transform.rotation, Canvas.transform) as GameObject;
+        go.name = "ContextMenu";
+
 
 
     }
 
     void Update()
     {
-        CheckTimeInput();
+        mouseController.Update(IsModal);
+        keyboardController.Update(IsModal);
 
         if (IsPaused == false)
         {
             world.Update(Time.deltaTime * timeScale);
         }
-    }
 
-    void CheckTimeInput()
-    {
-        if (IsModal)
-        {
-            // A modal dialog box is open. Bail.
-            return;
-        }
-
-        // TODO: Move this into centralized keyboard manager where
-        // all of the buttons can be rebinded.
-        if (Input.GetKeyDown(KeyCode.Space))
-        {
-            IsPaused = !IsPaused;
-            Logger.Log("Game " + (IsPaused ? "paused" : "resumed"));
-        }
-
-        if (Input.GetKeyDown(KeyCode.Plus) || Input.GetKeyDown(KeyCode.KeypadPlus))
-        {
-            if (currentTimeScalePosition == possibleTimeScales.Length - 1)
-            {
-                // We are on the top of possibleTimeScales so just bail out.
-                return;
-            }
-
-            currentTimeScalePosition++;
-            SetTimeScale(possibleTimeScales[currentTimeScalePosition]);
-        }
-        else if (Input.GetKeyDown(KeyCode.Minus) || Input.GetKeyDown(KeyCode.KeypadMinus))
-        {
-            if (currentTimeScalePosition == 0)
-            {
-                // We are on the bottom of possibleTimeScales so just bail out.
-                return;
-            }
-
-            currentTimeScalePosition--;
-            SetTimeScale(possibleTimeScales[currentTimeScalePosition]);
-        }
-        else if (Input.GetKeyDown(KeyCode.Alpha1) || Input.GetKeyDown(KeyCode.Keypad1))
-        {
-            SetTimeScale(1f);
-            currentTimeScalePosition = 2;
-        }
-        else if (Input.GetKeyDown(KeyCode.Alpha2) || Input.GetKeyDown(KeyCode.Keypad2))
-        {
-            SetTimeScale(2f);
-            currentTimeScalePosition = 3;
-        }
-        else if (Input.GetKeyDown(KeyCode.Alpha3) || Input.GetKeyDown(KeyCode.Keypad3))
-        {
-            SetTimeScale(4f);
-            currentTimeScalePosition = 4;
-        }
+        soundController.Update(Time.deltaTime);
     }
 
     /// <summary>
@@ -153,7 +137,7 @@ public class WorldController : MonoBehaviour
     public void SetTimeScale(float timeScale)
     {
         this.timeScale = timeScale;
-        Logger.Log("Game speed set to " + timeScale + "x");
+        Debug.Log("Game speed set to " + timeScale + "x");
     }
 
     /// <summary>
@@ -171,7 +155,7 @@ public class WorldController : MonoBehaviour
 
     public void NewWorld()
     {
-        Logger.Log("NewWorld button was clicked.");
+        Debug.Log("NewWorld button was clicked.");
 
         SceneManager.LoadScene(SceneManager.GetActiveScene().name);
     }
@@ -183,7 +167,7 @@ public class WorldController : MonoBehaviour
 
     public void LoadWorld(string fileName)
     {
-        Logger.Log("LoadWorld button was clicked.");
+        Debug.Log("LoadWorld button was clicked.");
 
         // Reload the scene to reset all data (and purge old references)
         loadWorldFromFile = fileName;
@@ -193,8 +177,8 @@ public class WorldController : MonoBehaviour
     void CreateEmptyWorld()
     {
         // get world size from settings
-        int width = int.Parse(Settings.getSetting("worldWidth", "100"));
-        int height = int.Parse(Settings.getSetting("worldHeight", "100"));
+        int width = Settings.getSettingAsInt("worldWidth", 100);
+        int height = Settings.getSettingAsInt("worldHeight", 100);
 
         // Create a world with Empty tiles
         world = new World(width, height);
@@ -205,7 +189,7 @@ public class WorldController : MonoBehaviour
 
     void CreateWorldFromSaveFile()
     {
-        Logger.Log("CreateWorldFromSaveFile");
+        Debug.Log("CreateWorldFromSaveFile");
         // Create a world from our save file data.
 
         XmlSerializer serializer = new XmlSerializer(typeof(World));
@@ -217,7 +201,7 @@ public class WorldController : MonoBehaviour
         TextReader reader = new StringReader(saveGameText);
 
 
-        Logger.Log(reader.ToString());
+        Debug.Log(reader.ToString());
         world = (World)serializer.Deserialize(reader);
         reader.Close();
 

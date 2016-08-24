@@ -9,6 +9,7 @@
 using UnityEngine;
 using System.Collections;
 using UnityEngine.UI;
+using ProjectPorcupine.Localization;
 
 public class MouseOverFurnitureTypeText : MonoBehaviour
 {
@@ -27,17 +28,18 @@ public class MouseOverFurnitureTypeText : MonoBehaviour
 
         if (myText == null)
         {
-            Logger.LogError("MouseOverTileTypeText: No 'Text' UI component on this object.");
+            Debug.LogError("MouseOverTileTypeText: No 'Text' UI component on this object.");
             this.enabled = false;
             return;
         }
 
-        mouseController = GameObject.FindObjectOfType<MouseController>();
+        mouseController = WorldController.Instance.mouseController;
         if (mouseController == null)
         {
-            Logger.LogError("How do we not have an instance of mouse controller?");
+            Debug.LogError("How do we not have an instance of mouse controller?");
             return;
         }
+
     }
 	
     // Update is called once per frame
@@ -47,11 +49,15 @@ public class MouseOverFurnitureTypeText : MonoBehaviour
 
         string s = "NULL";
 
-        if (t != null && t.furniture != null)
+        if (t != null && t.Furniture != null)
         {
-            s = t.furniture.Name;
+            s = t.Furniture.Name;
+            myText.text = LocalizationTable.GetLocalization("furniture") + ": " + s;
+        }
+        else
+        {
+            myText.text = "";
         }
 
-        myText.text = "Furniture: " + s;
     }
 }

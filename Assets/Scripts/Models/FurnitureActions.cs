@@ -6,20 +6,18 @@
 // file LICENSE, which is part of this source code package, for details.
 // ====================================================
 #endregion
-using UnityEngine;
 using System.Collections.Generic;
 using MoonSharp.Interpreter;
 using MoonSharp.Interpreter.Debugging;
 using MoonSharp.RemoteDebugger;
 using MoonSharp.RemoteDebugger.Network;
-
+using UnityEngine;
 
 public class FurnitureActions
 {
+    private static FurnitureActions _Instance;
 
-    static FurnitureActions _Instance;
-
-    Script myLuaScript;
+    private Script myLuaScript;
 
     public FurnitureActions()
     {
@@ -37,6 +35,8 @@ public class FurnitureActions
         myLuaScript.Globals["Inventory"] = typeof(Inventory);
         myLuaScript.Globals["Job"] = typeof(Job);
 
+        myLuaScript.Globals["ModUtils"] = typeof(ModUtils);
+
         // Also to access statics/globals
         myLuaScript.Globals["World"] = typeof(World);
     }
@@ -46,7 +46,7 @@ public class FurnitureActions
         _Instance.myLuaScript.DoString(rawLuaCode);
     }
 
-    static public void CallFunctionsWithFurniture(string[] functionNames, Furniture furn, float deltaTime)
+    public static void CallFunctionsWithFurniture(string[] functionNames, Furniture furn, float deltaTime)
     {
         foreach (string fn in functionNames)
         {
@@ -54,7 +54,7 @@ public class FurnitureActions
 
             if (func == null)
             {
-                Logger.LogError("'" + fn + "' is not a LUA function.");
+                Debug.LogError("'" + fn + "' is not a LUA function.");
                 return;
             }
 
@@ -62,12 +62,12 @@ public class FurnitureActions
 
             if (result.Type == DataType.String)
             {
-                Logger.Log(result.String);
+                Debug.Log(result.String);
             }
         }
     }
 
-    static public DynValue CallFunction(string functionName, params object[] args)
+    public static DynValue CallFunction(string functionName, params object[] args)
     {
         object func = _Instance.myLuaScript.Globals[functionName];
 
@@ -80,6 +80,6 @@ public class FurnitureActions
 
         // FIXME: I don't like having to manually and explicitly set
         // flags that preven conflicts. It's too easy to forget to set/clear them!
-        theJob.tile.pendingBuildJob = null;
+        theJob.tile.PendingBuildJob = null;
     }
 }

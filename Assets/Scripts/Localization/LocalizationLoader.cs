@@ -6,9 +6,8 @@
 // file LICENSE, which is part of this source code package, for details.
 // ====================================================
 #endregion
-using UnityEngine;
 using System.IO;
-using System.Collections;
+using UnityEngine;
 
 namespace ProjectPorcupine.Localization
 {
@@ -20,45 +19,63 @@ namespace ProjectPorcupine.Localization
     [AddComponentMenu("Localization/Localization Loader")]
     public class LocalizationLoader : MonoBehaviour
     {
-        //Initialize the localization files before Unity loads the scene entirely.
-        //Used to ensure that the TextLocalizer scripts won't throw errors.
-        void Awake()
+        /// <summary>
+        /// Scans Application.streamingAssetsPath/Localization folder in search for .lang files and load's them
+        /// to the LocalizationTable.
+        /// </summary>
+        public void UpdateLocalizationTable()
         {
-            //Check if the languages have already been loaded before.
-            if (LocalizationTable.initialized)
-            {
-                //Return in this case.
-                return;
-            }
-
-            //Get the filepath.
+            // Get the file path.
             string filePath = Path.Combine(Application.streamingAssetsPath, "Localization");
             
-            //Loop through all files.
-            foreach(string file in Directory.GetFiles(filePath))
+            // Loop through all files.
+            // TODO: Think over the extension ".lang", might change that in the future.
+            foreach (string file in Directory.GetFiles(filePath, "*.lang"))
             {
-                //Check if the file is really a .lang file, and nothing else.
-                //TODO: Think over the extension ".lang", might change that in the future.
-                if(file.EndsWith(".lang"))
-                {
-                    //The file extention is .lang, load it.
-                    LocalizationTable.LoadLocalizationFile(file);
+                // The file extention is .lang, load it.
+                LocalizationTable.LoadLocalizationFile(file);
 
-                    //Just write a little debug info into the console.
-                    Logger.Log("Loaded localization at path\n" + file);
+                // Just write a little debug info into the console.
+                Debug.Log("Loaded localization at path\n" + file);
+            }
+
+            foreach (DirectoryInfo mod in WorldController.Instance.modsManager.GetMods())
+            {
+                foreach (FileInfo file in mod.GetFiles("*.lang"))
+                {
+                    // Load the mod localization.
+                    LocalizationTable.LoadLocalizationFile(file.FullName);
+
+                    // Just write a little debug info into the console.
+                    Debug.ULogChannel("LocalizationLoader", "Loaded localization at path: " + file);
                 }
             }
 
-
-            // Atempt to get setting of currently selected language. (Will default to English).
+            // Attempt to get setting of currently selected language. (Will default to English).
             string lang = Settings.getSetting("localization", "en_US");
 
-            // setup LocalizationTable with either loaded or defaulted language
+            // Setup LocalizationTable with either loaded or defaulted language
             LocalizationTable.currentLanguage = lang;
 
+            // Tell the LocalizationTable that it has been initialized.
+            LocalizationTable.LoadingLanguagesFinished();
+        }
 
-            //Tell the LocalizationTable that it has been initialized.
-            LocalizationTable.initialized = true;
+        // Initialize the localization files before Unity loads the scene entirely.
+        // Used to ensure that the TextLocalizer scripts won't throw errors.
+        private void Awake()
+        {
+            // Check if the languages have already been loaded before.
+            if (LocalizationTable.initialized)
+            {
+                // Return in this case.
+                return;
+            }
+
+            // Update localization from the internet.
+            StartCoroutine(LocalizationDownloader.CheckIfCurrentLocalizationIsUpToDate(delegate { UpdateLocalizationTable(); }));
+
+            UpdateLocalizationTable();
         }
     }
 }

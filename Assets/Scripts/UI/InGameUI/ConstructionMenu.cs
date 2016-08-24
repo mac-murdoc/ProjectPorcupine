@@ -1,4 +1,12 @@
-﻿using UnityEngine;
+﻿#region License
+// ====================================================
+// Project Porcupine Copyright(C) 2016 Team Porcupine
+// This program comes with ABSOLUTELY NO WARRANTY; This is free software, 
+// and you are welcome to redistribute it under certain conditions; See 
+// file LICENSE, which is part of this source code package, for details.
+// ====================================================
+#endregion
+using UnityEngine;
 using UnityEngine.UI;
 using System.Collections;
 
@@ -9,11 +17,22 @@ public class ConstructionMenu : MonoBehaviour
     public GameObject furnitureMenu;
     public GameObject floorMenu;
 
+    BuildModeController bmc;
+
     public Button buttonFloors;
     public Button buttonFurniture;
 
-    void OnEnable()
+    public Button buttonDeconstruction;
+
+    void Start()
     {
+        bmc = WorldController.Instance.buildModeController;
+
+        buttonDeconstruction.onClick.AddListener(delegate
+            {
+                OnClickDeconstruct();
+            });
+        
         // Add liseners here.
         buttonFloors.onClick.AddListener(delegate
             {
@@ -21,8 +40,14 @@ public class ConstructionMenu : MonoBehaviour
             });
         buttonFurniture.onClick.AddListener(delegate
             {
-                OnClickFurniture();
+                OnClickFurniture(); 
             });
+    }
+
+    public void OnClickDeconstruct()
+    {
+        DeactivateSubs();
+        bmc.SetMode_Deconstruct();
     }
 
     public void OnClickFloors()
