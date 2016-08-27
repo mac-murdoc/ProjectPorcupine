@@ -106,6 +106,7 @@ namespace ProjectPorcupine.Localization
                         Debug.ULogErrorChannel("LocalizationTable", string.Format("Invalid format of localization string. Actual {0}", line));
                         continue;
                     }
+
                     localizationTable[localizationCode][keyValuePair[0]] = keyValuePair[1];
                 }
             }
@@ -129,7 +130,7 @@ namespace ProjectPorcupine.Localization
             if (!missingKeysLogged.Contains(key))
             {
                 missingKeysLogged.Add(key);
-                Debug.ULogErrorChannel("LocalizationTable", string.Format("Translation for {0} in {1} language failed: Key not in dictionary.", key, language));
+                Debug.ULogChannel("LocalizationTable", string.Format("Translation for {0} in {1} language failed: Key not in dictionary.", key, language));
             }
 
             switch (fallbackMode)

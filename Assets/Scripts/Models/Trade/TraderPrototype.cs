@@ -44,7 +44,9 @@ public class TraderPrototype
                             PotentialNames.Add(names_reader.Value);
                         }
                     }
+
                     break;
+                
                 case "minCurrencyBalance":
                     reader.Read();
                     MinCurrencyBalance = reader.ReadContentAsInt();
@@ -61,6 +63,7 @@ public class TraderPrototype
                     reader.Read();
                     MaxSaleMarginMultiplier = reader.ReadContentAsFloat();
                     break;
+                
                 case "potentialStock":
                     PotentialStock = new List<TraderPotentialInventory>();
                     XmlReader invs_reader = reader.ReadSubtree();
@@ -79,10 +82,12 @@ public class TraderPrototype
                             });
                         }
                     }
+
                     break;
             }
         }
     }
+
     public Trader CreateTrader()
     {
         Trader t = new Trader
@@ -101,7 +106,7 @@ public class TraderPrototype
                 t.Stock.Add(new Inventory
                 {
                     objectType = potentialStock.ObjectType,
-                    stackSize = Random.Range(potentialStock.MinQuantity,potentialStock.MaxQuantity)
+                    StackSize = Random.Range(potentialStock.MinQuantity, potentialStock.MaxQuantity)
                 });
             }
         }
