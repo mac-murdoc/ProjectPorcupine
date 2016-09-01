@@ -34,15 +34,15 @@ public static class Settings
   <ZoomSensitivity>3</ZoomSensitivity>
 </Settings>
 ";
+
+    private static readonly string DefaultSettingsFilePath = System.IO.Path.Combine(
+        Application.streamingAssetsPath, System.IO.Path.Combine("Settings", "Settings.xml"));
     
     private static Dictionary<string, string> settingsDict;
 
     private static string userSettingsFilePath = System.IO.Path.Combine(
         Application.persistentDataPath, "Settings.xml");
     
-    private static readonly string defaultSettingsFilePath = System.IO.Path.Combine(
-        Application.streamingAssetsPath, System.IO.Path.Combine("Settings", "Settings.xml"));
-
     public static string GetSetting(string key, string defaultValue)
     {
         // If we haven't already loaded our settings do it now.
@@ -179,15 +179,15 @@ public static class Settings
     private static void SaveSettings()
     {
         // Create an xml document.
-        XmlDocument xDoc = new XmlDocument();
+        XmlDocument doc = new XmlDocument();
 
         // Create main settings node.
-        XmlNode settingsNode = xDoc.CreateElement("Settings");
+        XmlNode settingsNode = doc.CreateElement("Settings");
 
         foreach (KeyValuePair<string, string> pair in settingsDict)
         {
             // Create a new element for each pair in the dict.
-            XmlElement settingElement = xDoc.CreateElement(pair.Key);
+            XmlElement settingElement = doc.CreateElement(pair.Key);
             settingElement.InnerText = pair.Value;
             Debug.ULogChannel("Settings", pair.Key + " : " + pair.Value);
 
@@ -196,12 +196,12 @@ public static class Settings
         }
 
         // Apend Settings node to the document.
-        xDoc.AppendChild(settingsNode);
+        doc.AppendChild(settingsNode);
 
         // Save the document.
         try
         {
-            xDoc.Save(userSettingsFilePath);
+            doc.Save(userSettingsFilePath);
         }
         catch (Exception e)
         {
@@ -242,13 +242,13 @@ public static class Settings
         }
 
         // Create an xml document from the loaded string.
-        XmlDocument xDoc = new XmlDocument();
-        xDoc.LoadXml(furnitureXmlText);
+        XmlDocument doc = new XmlDocument();
+        doc.LoadXml(furnitureXmlText);
         Debug.ULogChannel("Settings", "Loaded settings");
-        Debug.Log(xDoc.InnerText); // Uber Logger doesn't handle multilines.
+        Debug.ULogChannel("Settings", doc.InnerText); 
 
         // Get the Settings node. Its children are the individual settings.
-        XmlNode settingsNode = xDoc.GetElementsByTagName("Settings").Item(0);
+        XmlNode settingsNode = doc.GetElementsByTagName("Settings").Item(0);
         XmlNodeList settingNodes = settingsNode.ChildNodes;
         Debug.ULogChannel("Settings", settingNodes.Count + " settings loaded");
 
@@ -268,17 +268,17 @@ public static class Settings
     {
         string furnitureXmlText = FallbackSettingsXML;
 
-        if (System.IO.File.Exists(defaultSettingsFilePath) == false)
+        if (System.IO.File.Exists(DefaultSettingsFilePath) == false)
         {
-            Debug.ULogWarningChannel("Settings", "Default settings file could not be found at '" + defaultSettingsFilePath + "'. Falling back to Settings.cs defaults.");
+            Debug.ULogWarningChannel("Settings", "Default settings file could not be found at '" + DefaultSettingsFilePath + "'. Falling back to Settings.cs defaults.");
 
             try
             {
-                System.IO.File.WriteAllText(defaultSettingsFilePath, FallbackSettingsXML);
+                System.IO.File.WriteAllText(DefaultSettingsFilePath, FallbackSettingsXML);
             }
             catch (Exception e)
             {
-                Debug.ULogWarningChannel("Settings", "Default settings file could not be created at '" + defaultSettingsFilePath + "'.");
+                Debug.ULogWarningChannel("Settings", "Default settings file could not be created at '" + DefaultSettingsFilePath + "'.");
                 Debug.ULogWarningChannel("Settings", e.Message);
             }
         }
@@ -286,11 +286,11 @@ public static class Settings
         {
             try
             {
-                furnitureXmlText = System.IO.File.ReadAllText(defaultSettingsFilePath);
+                furnitureXmlText = System.IO.File.ReadAllText(DefaultSettingsFilePath);
             }
             catch (Exception e)
             {
-                Debug.ULogWarningChannel("Settings", "Settings file at '" + defaultSettingsFilePath + "' could not be read. Falling back to Settings.cs defaults.");
+                Debug.ULogWarningChannel("Settings", "Settings file at '" + DefaultSettingsFilePath + "' could not be read. Falling back to Settings.cs defaults.");
                 Debug.ULogWarningChannel("Settings", e.Message);
             }
         }

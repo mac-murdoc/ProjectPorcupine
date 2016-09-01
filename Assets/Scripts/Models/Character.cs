@@ -78,7 +78,7 @@ public class Character : IXmlSerializable, ISelectable, IContextActionProvider
     /// Use only for serialization
     public Character()
     {
-        needs = new Need[World.Current.needPrototypes.Count];
+        needs = new Need[PrototypeManager.Need.Count];
         LoadNeeds();
     }
 
@@ -219,7 +219,7 @@ public class Character : IXmlSerializable, ISelectable, IContextActionProvider
         yield return new ContextMenuAction
         {
             Text = "Poke " + GetName(),
-            RequiereCharacterSelected = false,
+            RequireCharacterSelected = false,
             Action = (cm, c) => Debug.ULogChannel("Character", GetDescription())
         };
     }
@@ -268,6 +268,60 @@ public class Character : IXmlSerializable, ISelectable, IContextActionProvider
         }
     }
 
+    public void PrioritizeJob(Job job)
+    {
+        AbandonJob(false);
+        World.Current.jobQueue.Remove(job);
+        job.IsBeingWorked = true;
+
+        /*Check if the character is carrying any materials and if they could be used for the new job,
+        if the character is carrying materials but is not used in the new job, then drop them
+        on the current tile for now.*/
+
+        if (inventory != null && !job.inventoryRequirements.ContainsKey(inventory.objectType))
+        {
+            World.Current.inventoryManager.PlaceInventory(CurrTile, inventory);
+            DumpExcessInventory();
+        }
+
+        MyJob = job;
+
+        // Get our destination from the job.
+        DestTile = MyJob.tile;
+
+        // If the dest tile does not have neighbours that are walkable it's very likable that they can't be walked to.
+        if (DestTile.GetNeighbours().Any((tile) => { return tile.MovementCost > 0; }) == false)
+        {
+            Debug.ULogChannel("Character", "No neighbouring floor tiles! Abandoning job.");
+            AbandonJob(false);
+            return;
+        }
+
+        MyJob.OnJobStopped += OnJobStopped;
+
+        pathAStar = new Path_AStar(World.Current, CurrTile, DestTile);
+
+        if (pathAStar != null && pathAStar.Length() == 0)
+        {
+            Debug.ULogChannel("Character", "Path_AStar returned no path to target job tile!");
+            AbandonJob(false);
+            return;
+        }
+
+        if (MyJob.adjacent)
+        {
+            IEnumerable<Tile> reversed = pathAStar.Reverse();
+            reversed = reversed.Skip(1);
+            pathAStar = new Path_AStar(new Queue<Tile>(reversed.Reverse()));
+            DestTile = pathAStar.EndTile();
+            jobTile = DestTile;
+        }
+        else
+        {
+            jobTile = MyJob.tile;
+        }
+    }
+
     /// Runs every "frame" while the simulation is not paused
     public void Update(float deltaTime)
     {
@@ -306,6 +360,14 @@ public class Character : IXmlSerializable, ISelectable, IContextActionProvider
         writer.WriteAttributeString("r", characterColor.r.ToString());
         writer.WriteAttributeString("b", characterColor.b.ToString());
         writer.WriteAttributeString("g", characterColor.g.ToString());
+        if (inventory != null)
+        {
+            writer.WriteStartElement("Inventories");
+            writer.WriteStartElement("Inventory");
+            inventory.WriteXml(writer);
+            writer.WriteEndElement();
+            writer.WriteEndElement();
+        }
     }
 
     public void ReadXml(XmlReader reader)
@@ -380,9 +442,9 @@ public class Character : IXmlSerializable, ISelectable, IContextActionProvider
 
     private void LoadNeeds()
     {
-        needs = new Need[World.Current.needPrototypes.Count];
-        World.Current.needPrototypes.Values.CopyTo(needs, 0);
-        for (int i = 0; i < World.Current.needPrototypes.Count; i++)
+        needs = new Need[PrototypeManager.Need.Count];
+        PrototypeManager.Need.Values.CopyTo(needs, 0);
+        for (int i = 0; i < PrototypeManager.Need.Count; i++)
         {
             Need need = needs[i];
             needs[i] = need.Clone();
@@ -405,12 +467,12 @@ public class Character : IXmlSerializable, ISelectable, IContextActionProvider
 
         if (needPercent > 50 && needPercent < 100 && need != null)
         {
-            MyJob = new Job(null, need.RestoreNeedFurn.ObjectType, need.CompleteJobNorm, need.RestoreNeedTime, null, JobPriority.High, false, true, false);
+            MyJob = new Job(null, need.RestoreNeedFurn.ObjectType, need.CompleteJobNorm, need.RestoreNeedTime, null, Job.JobPriority.High, false, true, false);
         }
 
         if (needPercent == 100 && need != null && need.CompleteOnFail)
         {
-            MyJob = new Job(CurrTile, null, need.CompleteJobCrit, need.RestoreNeedTime * 10, null, JobPriority.High, false, true, true);
+            MyJob = new Job(CurrTile, null, need.CompleteJobCrit, need.RestoreNeedTime * 10, null, Job.JobPriority.High, false, true, true);
         }
 
         // Get the first job on the queue.
@@ -428,7 +490,7 @@ public class Character : IXmlSerializable, ISelectable, IContextActionProvider
                     null,
                     UnityEngine.Random.Range(0.1f, 0.5f),
                     null,
-                    JobPriority.Low,
+                    Job.JobPriority.Low,
                     false);
                 MyJob.JobDescription = "job_waiting_desc";
             }
@@ -448,12 +510,15 @@ public class Character : IXmlSerializable, ISelectable, IContextActionProvider
         // Get our destination from the job.
         DestTile = MyJob.tile;
 
-        // If the dest tile does not have neighbours that are walkable it's very likable that they can't be walked to
-        if (DestTile.GetNeighbours().Any((tile) => { return tile.MovementCost > 0; }) == false)
+        // If the dest tile does not have neighbours that are walkable it's very likely that they can't be walked to
+        if (DestTile != null)
         {
-            Debug.ULogChannel("Character", "No neighbouring floor tiles! Abandoning job.");
-            AbandonJob(false);
-            return;
+            if (DestTile.GetNeighbours().Any((tile) => { return tile.MovementCost > 0; }) == false)
+            {
+                Debug.ULogChannel("Character", "No neighbouring floor tiles! Abandoning job.");
+                AbandonJob(false);
+                return;
+            }
         }
 
         MyJob.OnJobStopped += OnJobStopped;
@@ -494,6 +559,8 @@ public class Character : IXmlSerializable, ISelectable, IContextActionProvider
         {
             jobTile = MyJob.tile;
         }
+
+        MyJob.IsBeingWorked = true;
     }
 
     private void Update_DoJob(float deltaTime)
@@ -558,7 +625,7 @@ public class Character : IXmlSerializable, ISelectable, IContextActionProvider
         }
         else
         {
-            fulfillableInventoryRequirements = FulfillableInventoryRequirements(MyJob);
+            fulfillableInventoryRequirements = MyJob.FulfillableInventoryRequirements();
 
             // If we somehow get here and fulfillableInventoryRequirements is empty then there is a problem!
             if (fulfillableInventoryRequirements == null || fulfillableInventoryRequirements.Count() == 0)
@@ -683,39 +750,6 @@ public class Character : IXmlSerializable, ISelectable, IContextActionProvider
         }
 
         return false; // We can't continue until all materials are satisfied.
-    }
-
-    /// <summary>
-    /// Fulfillable inventory requirements for job.
-    /// </summary>
-    /// <returns>A list of (string) objectTypes for job inventory requirements that can be met. Returns null if the job requires materials which do not exist on the map.</returns>
-    private List<string> FulfillableInventoryRequirements(Job job)
-    {
-        List<string> fulfillableInventoryRequirements = new List<string>();
-
-        foreach (Inventory inv in job.GetInventoryRequirementValues())
-        {
-            if (job.acceptsAny == false)
-            {
-                if (World.Current.inventoryManager.QuickCheck(inv.objectType) == false)
-                {
-                    // the job requires ALL inventory requirements to be met, and there is no source of a desired objectType
-                    ///AbandonJob(true);
-                    return null;
-                }
-                else
-                {
-                    fulfillableInventoryRequirements.Add(inv.objectType);
-                }
-            }
-            else if (World.Current.inventoryManager.QuickCheck(inv.objectType))
-            {
-                // there is a source for a desired objectType that the job will accept
-                fulfillableInventoryRequirements.Add(inv.objectType);
-            }
-        }
-
-        return fulfillableInventoryRequirements;
     }
 
     private bool WalkingToUsableInventory()
@@ -892,7 +926,7 @@ public class Character : IXmlSerializable, ISelectable, IContextActionProvider
         // cancelling the job manually.
         if (job != null)
         {
-            List<string> desired = FulfillableInventoryRequirements(job);
+            List<string> desired = job.FulfillableInventoryRequirements();
 
             // Check if the created inventory can fulfill the waiting job requirements.
             if (desired != null && desired.Contains(inv.objectType))
